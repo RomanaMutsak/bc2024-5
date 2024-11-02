@@ -3,13 +3,16 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const app = express();
-const upload = multer();
+const upload = multer(); // middleware для обробки форм
 const notesDir = './cache';
 
-// Перевіряємо чи існує директорія для кешу, інакше створюємо
+// Перевіряємо, чи існує директорія для кешу, інакше створюємо
 if (!fs.existsSync(notesDir)) {
     fs.mkdirSync(notesDir);
 }
+
+// Middleware для обробки URL-кодованих даних
+app.use(express.urlencoded({ extended: true }));
 
 // GET /UploadForm.html
 app.get('/UploadForm.html', (req, res) => {
@@ -62,18 +65,24 @@ app.get('/notes', (req, res) => {
 });
 
 // POST /write
-app.post('/write', (req, res) => {
+app.post('/write', upload.none(), (req, res) => {
+    console.log(req.body); // Перевірка отриманих даних
     const noteName = req.body.note_name;
     const noteText = req.body.note;
 
-    if (notes[noteName]) {
-        return res.status(400).json({ error: 'Note already exists.' });
+    if (!noteName || !noteText) {
+        return res.status(400).send('Note name and text are required');
     }
 
-    notes[noteName] = noteText;
-    return res.status(201).json({ message: 'Note created.' });
-});
+    const notePath = path.join(notesDir, `${noteName}.txt`);
 
+    if (fs.existsSync(notePath)) {
+        return res.status(400).send('Note with this name already exists');
+    }
+
+    fs.writeFileSync(notePath, noteText, 'utf-8');
+    res.status(201).send('Note created');
+});
 
 // Запуск сервера
 const PORT = process.env.PORT || 3000;
